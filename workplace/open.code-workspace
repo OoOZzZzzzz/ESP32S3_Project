@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "ESP32S3",
+			"path": "../esp32_p"
+		},
+		{
+			"name": "vue_web",
+			"path": "../web_p"
+		}
+	],
+	"settings": {}
+}
