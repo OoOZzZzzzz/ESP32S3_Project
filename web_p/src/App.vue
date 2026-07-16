@@ -1,51 +1,79 @@
 <template>
+  <!-- 页面根容器 -->
   <div id="app">
     <div class="container">
-      <h1>🌡️ ESP32-S3 传感器监控</h1>
+      <!-- 页面大标题 -->
+      <h1>🌡️ ESP32-S3 温湿度实时监控系统</h1>
 
-      <!-- 新增IP输入区域 -->
-      <div class="ip-setting">
-        <label>ESP32 地址：</label>
-        <input
-          v-model="esp32IP"
-          placeholder="http://10.218.102.xxx"
-          @input="resetData"
-        />
-        <div class="chick">
-          <button @click="fetchData" class="btn">切换IP并重试</button>
+      <!-- IP输入配置卡片区域 -->
+      <div class="card ip-card">
+        <h3>设备连接配置</h3>
+        <div class="ip-setting">
+          <label>ESP32 服务地址：</label>
+          <input
+            v-model="esp32IP"
+            placeholder="http://192.168.248.100"
+            @input="resetAll"
+          />
+          <button @click="fetchData" class="btn primary">立即连接</button>
         </div>
       </div>
 
+      <!-- 连接状态提示栏 -->
       <div class="status" :class="statusClass">
         {{ statusMessage }}
       </div>
 
-      <div v-if="data" class="sensor-data">
-        <div class="data-item">
-          <span class="label">温度:</span>
-          <span class="value">{{ data.temperature }}°C</span>
-        </div>
-        <div class="data-item">
-          <span class="label">湿度:</span>
-          <span class="value">{{ data.humidity }}%</span>
+      <!-- 波形图表卡片 -->
+      <div class="card chart-card" v-show="dataList.length > 0">
+        <h3>温湿度实时波形曲线</h3>
+        <div class="chart-wrap">
+          <canvas ref="chartRef"></canvas>
         </div>
       </div>
 
-      <div class="controls">
-        <button @click="fetchData" :disabled="loading" class="btn">
-          {{ loading ? '获取中...' : '获取数据' }}
+      <!-- 当前实时数值面板 -->
+      <div class="card data-card" v-if="data">
+        <h3>当前实时数据</h3>
+        <div class="data-row">
+          <div class="data-item temp">
+            <div class="label">温度</div>
+            <div class="value">{{ data.temperature }} ℃</div>
+          </div>
+          <div class="data-item hum">
+            <div class="label">湿度</div>
+            <div class="value">{{ data.humidity }} %RH</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ESP32 LED硬件控制卡片 -->
+      <div class="card ctrl-card">
+        <h3>硬件LED控制</h3>
+        <div class="btn-group">
+          <button @click="sendCmd('led_on')" class="btn success">点亮LED</button>
+          <button @click="sendCmd('led_off')" class="btn danger">关闭LED</button>
+        </div>
+      </div>
+
+      <!-- 操作按钮区域 -->
+      <div class="refresh-box">
+        <button @click="fetchData" :disabled="loading" class="btn primary">
+          {{ loading ? "请求中..." : "手动刷新数据" }}
         </button>
+        <button @click="resetAll" class="btn danger" style="margin-left:12px">清空曲线重置</button>
       </div>
 
-      <div v-if="error" class="error">
-        <h4>错误详情:</h4>
-        <p>{{ error }}</p>
+      <!-- 网络/接口错误提示卡片 -->
+      <div v-if="error && !data" class="card error-card">
+        <h4>⚠️ 连接异常</h4>
+        <p class="err-text">{{ error }}</p>
         <div class="solutions">
-          <h5>解决方案:</h5>
+          <h5>排查方案</h5>
           <ol>
-            <li>确保 ESP32 代码已添加 CORS 支持</li>
-            <li>尝试使用 Chrome 禁用 CORS 模式</li>
-            <li>或在浏览器中直接访问: <a :href="apiUrl" target="_blank">{{ apiUrl }}</a></li>
+            <li>ESP32与电脑/手机连接同一局域网WiFi</li>
+            <li>确认ESP32固件完整开启CORS跨域代码</li>
+            <li>点击链接单独访问接口测试：<a :href="apiUrl" target="_blank">{{ apiUrl }}</a></li>
           </ol>
         </div>
       </div>
@@ -55,298 +83,365 @@
 
 <script>
 import { ESP32_DEFAULT_IP } from "@/config/env.js";
+import { Chart, registerables } from "chart.js";
+Chart.register(...registerables);
 
 export default {
-  name: 'App',
+  name: "App",
   data() {
     return {
       loading: false,
-      error: '',
+      error: "",
       data: null,
-      testResult: '',
-      lastResponse: '',
-      showDebug: false,
-      // 默认填你自己的静态IP，也可以使用页面修改输入框即可
-      esp32IP: ESP32_DEFAULT_IP
-    }
+      esp32IP: ESP32_DEFAULT_IP,
+
+      chart: null,
+      chartRef: null,
+      dataList: [],
+      timeLabelList: [],
+      maxCache: 30,
+      timer: null,
+    };
   },
   computed: {
     apiUrl() {
-      return `${this.esp32IP}/api/data`
+      return `${this.esp32IP}/api/data`;
     },
     statusMessage() {
-      if (this.loading) return '🔄 连接中...'
-      if (this.error) return '❌ 连接失败'
-      if (this.data) return '✅ 已连接'
-      return '⏳ 等待连接'
+      if (this.loading) return "🔄 正在请求设备数据";
+      if (this.data) return "✅ 设备正常通信中";
+      if (this.error) return "❌ 设备连接失败";
+      return "⏳ 等待首次连接";
     },
     statusClass() {
-      if (this.loading) return 'loading'
-      if (this.error) return 'error-status'
-      if (this.data) return 'connected'
-      return 'disconnected'
-    }
+      if (this.loading) return "loading";
+      if (this.data) return "connected";
+      if (this.error) return "error-status";
+      return "disconnected";
+    },
   },
   mounted() {
-    this.fetchData()
+    // 延时初始化图表，保证canvas DOM就绪
+    setTimeout(() => this.initChart(), 200);
+    // 页面打开先拉一次数据
+    this.fetchData();
+    // 4秒轮询稳定获取数据
+    this.timer = setInterval(() => this.fetchData(), 4000);
+  },
+  beforeUnmount() {
+    clearInterval(this.timer);
+    if (this.chart) this.chart.destroy();
   },
   methods: {
-    // 新增：修改IP后清空旧数据和错误
-    resetData() {
-      this.data = null
-      this.error = ''
+    resetAll() {
+      this.data = null;
+      this.error = "";
+      this.dataList = [];
+      this.timeLabelList = [];
+      if (this.chart) {
+        this.chart.destroy();
+        this.chart = null;
+      }
+    },
+
+    initChart() {
+      this.chartRef = this.$refs.chartRef;
+      if (!this.chartRef) return;
+      this.chart = new Chart(this.chartRef, {
+        type: "line",
+        data: {
+          labels: this.timeLabelList,
+          datasets: [
+            {
+              label: "温度 ℃",
+              data: this.dataList.map(v => v.temperature),
+              borderColor: "#007bff",
+              backgroundColor: "rgba(0, 123, 255, 0.1)",
+              fill: true,
+              tension: 0.3,
+              pointRadius: 2,
+              yAxisID: "y",
+            },
+            {
+              label: "湿度 %RH",
+              data: this.dataList.map(v => v.humidity),
+              borderColor: "#28a745",
+              backgroundColor: "rgba(40, 167, 69, 0.1)",
+              fill: true,
+              tension: 0.3,
+              pointRadius: 2,
+              yAxisID: "y1",
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: {
+            legend: {
+              position: "top",
+              labels: { font: { size: 14 } }
+            },
+            tooltip: {
+              mode: "index",
+              intersect: false,
+              callbacks: {
+                title: items => "采集时间：" + items[0].label
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                maxTicksLimit: 10,
+                maxRotation: 45,
+                minRotation: 45,
+                font: { size: 11 }
+              },
+              grid: { color: "rgba(0,0,0,0.05)" },
+              title: { display: true, text: "采集时间", font: { size: 14 } }
+            },
+            y: {
+              type: "linear",
+              display: true,
+              position: "left",
+              title: { display: true, text: "温度 (℃)", color: "#007bff", font: { size: 13 } },
+              grid: { drawOnChartArea: false, color: "rgba(0,123,255,0.1)" },
+            },
+            y1: {
+              type: "linear",
+              display: true,
+              position: "right",
+              title: { display: true, text: "湿度 (%RH)", color: "#28a745", font: { size: 13 } },
+              grid: { drawOnChartArea: false, color: "rgba(40,167,69,0.1)" },
+            },
+          },
+        },
+      });
+    },
+
+    // 核心绘图修复：每次更新销毁重建，彻底解决v-show空白
+    updateChart() {
+      if (this.chart) {
+        this.chart.destroy();
+        this.chart = null;
+      }
+      this.initChart();
     },
 
     async fetchData() {
+      if (this.loading) return;
       try {
-        this.loading = true
-        this.error = ''
-        this.lastResponse = '开始请求...'
-
-        const response = await fetch(this.apiUrl, {
-          method: 'GET',
-          mode: 'cors',
-          headers: {
-            'Accept': 'application/json'
-          }
-        })
-
-        this.lastResponse = `状态: ${response.status} ${response.statusText}`
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        this.loading = true;
+        this.error = "";
+        const res = await fetch(this.apiUrl, {
+          method: "GET",
+          mode: "cors",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const result = await res.json();
+        if (typeof result.temperature !== "number" || typeof result.humidity !== "number") {
+          throw new Error("返回数据格式异常");
         }
 
-        const result = await response.json()
-        this.lastResponse = `成功: ${JSON.stringify(result)}`
-        
-        if (result && typeof result.temperature === 'number' && typeof result.humidity === 'number') {
-          this.data = result
-        } else {
-          throw new Error('无效的数据格式')
+        const now = new Date();
+        const timeStr = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
+        this.timeLabelList.push(timeStr);
+        this.dataList.push(result);
+
+        if (this.timeLabelList.length > this.maxCache) {
+          this.timeLabelList.shift();
+          this.dataList.shift();
         }
 
+        this.updateChart();
+        this.data = result;
       } catch (err) {
-        console.error('请求失败:', err)
-        this.error = err.message
-        this.lastResponse = `错误: ${err.message}`
-        
-        if (err.message.includes('Failed to fetch') || err.message.includes('CORS')) {
-          this.error += ' (可能是 CORS 问题)'
+        console.error(err);
+        this.error = err.message;
+        if (err.message.includes("Failed to fetch") || err.message.includes("CORS")) {
+          this.error += " 跨域/设备离线";
         }
       } finally {
-        this.loading = false
+        this.loading = false;
       }
     },
 
-    async testConnection() {
+    async sendCmd(cmd) {
+      if (this.loading) return;
       try {
-        this.testResult = '测试中...'
-        const response = await fetch(this.esp32IP, {
-          method: 'GET',
-          mode: 'no-cors'
-        })
-        this.testResult = '✅ 基本连接正常'
+        const res = await fetch(`${this.esp32IP}/api/cmd`, {
+          method: "POST",
+          mode: "cors",
+          headers: { "Content-Type": "text/plain" },
+          body: cmd,
+        });
+        if (!res.ok) throw new Error("指令发送失败");
+        alert("硬件指令下发成功");
+        this.error = "";
       } catch (err) {
-        this.testResult = '❌ 连接测试失败'
+        this.error = "控制指令发送失败：" + err.message;
       }
     },
-
-    updateIP() {
-      this.data = null
-      this.error = ''
-      this.fetchData()
-    },
-
-    clearDebug() {
-      this.lastResponse = ''
-    }
-  }
-}
+  },
+};
 </script>
 
-
-<style>
+<style scoped>
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
-
 body {
-  font-family: Arial, sans-serif;
-  background: #f5f5f5;
-  padding: 20px;
+  font-family: "Microsoft Yahei", Arial, sans-serif;
+  background: #f0f2f5;
+  padding: 24px 12px;
 }
-
 #app {
-  max-width: 600px;
+  max-width: 900px;
   margin: 0 auto;
 }
-
-.container {
-  background: white;
-  padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
 h1 {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  color: #222;
+  font-size: 26px;
+}
+h3 {
+  margin-bottom: 16px;
   color: #333;
+  font-size: 18px;
 }
-
-.config {
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 5px;
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
   margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
-
-/* .ip-input, .connection-test {
+.ip-setting {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
-
-.ip-input input {
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  flex: 1;
-} */
-
-/* .btn-small {
-  padding: 6px 12px;
-  background: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-} */
-
-
-.ip-setting {
-  text-align: center;
-  margin: 6px 0;
-}
-
 .ip-setting input {
-  width: 220px;
-  padding: 6px 8px;
-  margin: 0 8px;
+  flex: 1;
+  min-width: 280px;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 15px;
 }
-
-.chick {
+.status {
+  padding: 14px;
+  border-radius: 8px;
   text-align: center;
-  margin: 12px 0;
-}
-
-.btn {
-  padding: 10px 20px;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+  font-weight: bold;
   font-size: 16px;
 }
-
-.btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
+.loading {
+  background: #fff7e0;
+  color: #d48806;
 }
-
-.status {
-  padding: 10px;
-  border-radius: 5px;
-  text-align: center;
-  margin: 20px 0;
-  font-weight: bold;
+.connected {
+  background: #e6f7ef;
+  color: #009a61;
 }
-
-.loading { background: #fff3cd; color: #856404; }
-.connected { background: #d4edda; color: #155724; }
-.error-status { background: #f8d7da; color: #721c24; }
-.disconnected { background: #e2e3e5; color: #383d41; }
-
-.sensor-data {
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 5px;
-  margin: 20px 0;
+.error-status {
+  background: #fee;
+  color: #e53e3e;
 }
-
-.data-item {
+.disconnected {
+  background: #f6f7f9;
+  color: #666;
+}
+.chart-wrap {
+  width: 100%;
+  height: 320px;
+}
+.data-row {
   display: flex;
-  justify-content: space-between;
-  margin: 10px 0;
-  padding: 10px;
-  background: white;
-  border-radius: 4px;
+  gap: 20px;
+  justify-content: center;
 }
-
-.label {
-  font-weight: bold;
-}
-
-.value {
-  color: #007bff;
-  font-weight: bold;
-  font-size: 1.2em;
-}
-
-.controls {
+.data-item {
+  flex: 1;
   text-align: center;
-  margin: 20px 0;
+  padding: 24px 10px;
+  border-radius: 10px;
 }
-
-.error {
-  background: #f8d7da;
-  border: 1px solid #f5c6cb;
-  border-radius: 5px;
-  padding: 15px;
-  margin: 20px 0;
+.temp {
+  background: #e8f4ff;
 }
-
-.error h4 {
-  color: #721c24;
+.hum {
+  background: #e6f7ef;
+}
+.data-item .label {
+  font-size: 16px;
+  color: #555;
   margin-bottom: 10px;
 }
-
-.solutions {
-  margin-top: 10px;
-}
-
-.solutions h5 {
-  color: #721c24;
-  margin-bottom: 5px;
-}
-
-.solutions ol {
-  margin-left: 20px;
-}
-
-/* .debug {
-  background: #e9ecef;
-  padding: 15px;
-  border-radius: 5px;
-  margin-top: 20px;
-} */
-
-.test-result {
-  margin-left: 10px;
+.data-item .value {
+  font-size: 28px;
   font-weight: bold;
 }
-
+.temp .value {
+  color: #007bff;
+}
+.hum .value {
+  color: #28a745;
+}
+.btn-group {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+}
+.refresh-box {
+  text-align: center;
+  margin: 10px 0 20px;
+}
+.btn {
+  padding: 11px 22px;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.btn:disabled {
+  background: #ccc !important;
+  cursor: not-allowed;
+}
+.primary {
+  background: #007bff;
+  color: #fff;
+}
+.success {
+  background: #28a745;
+  color: #fff;
+}
+.danger {
+  background: #dc3545;
+  color: #fff;
+}
+.error-card {
+  background: #fff2f2;
+  border: 1px solid #ffcdcd;
+}
+.err-text {
+  color: #c53030;
+  margin: 8px 0 12px;
+}
+.solutions ol {
+  padding-left: 20px;
+  line-height: 1.7;
+  color: #444;
+}
 a {
   color: #007bff;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
 }
 </style>
