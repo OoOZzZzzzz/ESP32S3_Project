@@ -2,7 +2,7 @@
 
 
 
-![整体效果](https://github.com/OoOZzZzzzz/ESP32S3_Project/raw/master/image/整体效果.png)
+![整体效果](https://github.com/OoOZzZzzzz/ESP32S3_Project/blob/main/image/%E6%95%B4%E4%BD%93%E6%95%88%E6%9E%9C.png?raw=true)
 
 
 
