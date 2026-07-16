@@ -2,7 +2,7 @@
 
 
 
-![整体效果](image\整体效果.png)
+![整体效果](https://github.com/OoOZzZzzzz/ESP32S3_Project/raw/master/image/整体效果.png)
 
 
 
