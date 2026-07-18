@@ -4,7 +4,7 @@
 
 ![整体效果](https://github.com/OoOZzZzzzz/ESP32S3_Project/blob/main/image/%E6%95%B4%E4%BD%93%E6%95%88%E6%9E%9C.png?raw=true)
 
-整套软件工程分成两部分：ESP32-S3 设备程序、Vue 网页监控页面。
+整套软件工程分成两部分：ESP32-S3 设备程序（esp32_p文件夹下）、Vue 网页监控页面（web_p文件夹下）。
 
  以获取温度数据为例子：ESP32 连上 WiFi 后搭建简易网页服务，对外提供温湿度数据接口；Vue 页面直接访问接口，在页面上展示温度、湿度。 整套代码支持静态IP、动态IP两种模式，分享给别人不用改源码，只需要在页面填设备IP就能用，自带跨域处理，不会出现浏览器跨域报错。
 
@@ -16,7 +16,65 @@
 
 
 
-等待后续更新......
+
+
+
+
+## 原理图
+
+
+
+见hardware中的PDF文件
+
+
+
+## PCB
+
+
+
+### BOM表如下
+
+| No.  | Quantity | Comment                 | Designator                       | Footprint                          | Value      | Manufacturer Part         | Manufacturer         | Supplier Part | Supplier |
+| ---- | -------- | ----------------------- | -------------------------------- | ---------------------------------- | ---------- | ------------------------- | -------------------- | ------------- | -------- |
+| 1    | 6        | LED_0603-R              | 3V3,IO37,RX,TX,UD+,UD-           | LED_0603                           | -          | -                         | -                    | -             | LCSC     |
+| 2    | 2        | KEY-TS1145              | BOOT,RST                         | TS1145-B-A                         | KEY-TS1145 | -                         | -                    | -             | LCSC     |
+| 3    | 4        | 0.1uF                   | C1,C2,C6,C8                      | C0603                              | 0.1uF      | -                         | SAMSUNG (三星)       | C38523        | LCSC     |
+| 4    | 2        | 12pF                    | C3,C4                            | C0603                              | 12pF       | CL10C120JB8NNNC           | SAMSUNG (三星)       | C38523        | LCSC     |
+| 5    | 1        | 22uF                    | C5                               | C0603                              | 22uF       | -                         | -                    | -             | LCSC     |
+| 6    | 1        | 1uF                     | C7                               | C0603                              | 1uF        | -                         | -                    | -             | LCSC     |
+| 7    | 1        | 10pF                    | C9                               | C0603                              | 10pF       | -                         | -                    | -             | LCSC     |
+| 8    | 2        | 100nF                   | C10,C13                          | C0603                              | 100nF      | -                         | -                    | -             | LCSC     |
+| 9    | 1        | 10uF                    | C11                              | C0603                              | 10uF       | -                         | -                    | -             | LCSC     |
+| 10   | 1        | 10nF                    | C12                              | C0603                              | 10nF       | -                         | -                    | -             | LCSC     |
+| 11   | 1        | 22uF                    | C30                              | CAP-SMD_L2.1-W1.4-FD               | 22uF       | TAJP106M010RNJ            | Kyocera AVX          | -             | LCSC     |
+| 12   | 2        | 100nF                   | C31,C32                          | C0603                              | 100nF      | CL10B104KB8NNNC           | SAMSUNG (三星)       | C1591         | LCSC     |
+| 13   | 1        | 10uF                    | C33                              | C0603                              | 10uF       | CL10B104KB8NNNC           | SAMSUNG (三星)       | C1591         | LCSC     |
+| 14   | 2        | 1N5819                  | D1,D15                           | SOD-323_L16-W1.3-LS2.6-W1.3        | 1N5819     | 1N5819                    | KTP (科泰普)         | C48997863     | LCSC     |
+| 15   | 1        | RCLAMP0521T-ES          | D14                              | DFN1006-2L-BI                      | -          | RCLAMP0521T-ES            | ElecSuper (静芯微)   | C5180263      | LCSC     |
+| 16   | 1        | BSMD0603L-              | F1                               | F0603                              | -          | BSMD0603L-100             | BHFUSE (佰宏)        | C2757929      | LCSC     |
+| 17   | 3        | HDR-F_2.54_1x11P        | H7,H8,H10                        | HDR-TH_11P-P2.54-V-F               | -          | -                         | -                    | C2897374      | LCSC     |
+| 18   | 1        | UPZ1608U221-2R2TF       | L1                               | L0603                              | -          | UPZ1608U221-2R2TF         | Sunlord (顺络)       | C279745       | LCSC     |
+| 19   | 1        | UMH3N                   | Q3                               | SC-70-6_L2.2-W1.3-P0.65-LS2.1-BR   | -          | UMH3N                     | CJ (江苏长电 / 长晶) | C62892        | LCSC     |
+| 20   | 2        | 5.1kΩ                   | R1,R2                            | R0603                              | 5.1kΩ      | 0603WAF1051T5E            | UNI-ROYAL (厚声)     | -             | LCSC     |
+| 21   | 2        | 22Ω                     | R3,R4                            | R0603                              | 22Ω        | 0603WAF10022T5E           | UNI-ROYAL (厚声)     | -             | LCSC     |
+| 22   | 1        | 8.2MΩ                   | R5                               | R0603                              | 8.2MΩ      | RMC06038.2M5%N            | Tyohm (幸亚电阻)     | C269652       | LCSC     |
+| 23   | 9        | 0Ω                      | R6,R7,R9,R12,R13,R14,R15,R16,R17 | R0603                              | 0          | -                         | -                    | -             | LCSC     |
+| 24   | 2        | 10K                     | R8,R10                           | R0603                              | 10K        | -                         | -                    | -             | LCSC     |
+| 25   | 1        | 2.7K                    | R11                              | R0603                              | 2.7K       | -                         | -                    | -             | LCSC     |
+| 26   | 5        | 4.7K                    | R18,R19,R20,R21,R22              | R0603                              | 4.7K       | -                         | -                    | -             | LCSC     |
+| 27   | 4        | 小焊盘                  | TCK1,TDI1,TDO1,TMS1              | 小焊盘                             | -          | -                         | -                    | -             | LCSC     |
+| 28   | 1        | ESP32-S3-WROOM-1U-N16R8 | U1                               | WIRELM-SMD_ESP32-S3-WROOM-1U       | -          | ESP32-S3-WROOM-1U-N16R8   | ESPRESSIF (乐鑫)     | C3013946      | LCSC     |
+| 29   | 1        | CH334F                  | U5                               | QFN-24_L4.0-W4.0-P0.50-BL-EP2.8    | -          | CH334F                    | WCH (南京沁恒)       | C5187527      | LCSC     |
+| 30   | 1        | RT9013-33GB             | U6                               | SOT-23-5_L3.0-W1.7-P0.9-LS2.8-BL   | -          | RT9013-33GB               | RICHTEK (立锜)       | C47773        | LCSC     |
+| 31   | 1        | CH340K                  | U12                              | ESOP-10_L4.9-W3.9-P1.0-LS6.2-BL-EP | -          | CH340K                    | WCH (南京沁恒)       | C968586       | LCSC     |
+| 32   | 2        | RCLAMP0521T-ES          | U13,U14                          | DFN1006-2L-BI                      | -          | RCLAMP0521T-ES            | ElecSuper (静芯微)   | C5180263      | LCSC     |
+| 33   | 1        | TYPE-C                  | USB2                             | USB-C-SMD_TYPE-C16P(073)           | -          | TYPE-C16P(073)            | SHOU (首韩)          | C668624       | LCSC     |
+| 34   | 1        | 32.768kHz               | X1                               | OSC-SMD_L2.0-W1.2                  | 32.768kHz  | SC-20S32.768kHz-20PPM7P/F | Seiko (精工)         | C97602        | LCSC     |
+| 35   | 1        | 12MHz                   | X2                               | OSC-SMD_4P-L3.2-W2.5-BL            | 12MHz      | X322512MSB4SI             | YXC (扬兴晶振)       | C9002         | LCSC     |
+
+
+
+也可见hardware文件夹下的PCB.pdf
 
 
 
