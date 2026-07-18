@@ -16,7 +16,21 @@
 
 
 
+## 3D展示
 
+
+
+### 正面
+
+
+
+![正面](https://github.com/OoOZzZzzzz/ESP32S3_Project/blob/main/Hardware/PCB_pictures/%E6%AD%A3%E9%9D%A2.png?raw=true)
+
+### 反面
+
+
+
+![反面](https://github.com/OoOZzZzzzz/ESP32S3_Project/blob/main/Hardware/PCB_pictures/%E5%BA%95%E9%9D%A2.png?raw=true)
 
 
 
@@ -24,7 +38,7 @@
 
 
 
-见hardware中的PDF文件
+见Hardware中的PDF文件
 
 
 
@@ -74,7 +88,7 @@
 
 
 
-也可见hardware文件夹下的PCB.pdf
+也可见Hardware文件夹下的PCB.pdf
 
 
 
